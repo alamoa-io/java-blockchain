@@ -1,7 +1,16 @@
 <!DOCTYPE html>
 <html lang="ja" xmlns:th="http://www.thymeleaf.org">
 <body>
-<h1>json: <span th:text="${json}">json</span></h1>
-<h1>hash: <span th:text="${hash}">hash</span></h1>
+<h1>step1 初期ブロック作成</h1>
+<h2>init block: <span th:text="${first}">first block</span></h2>
+
+<h1>step2 トランザクション追加(transaction pool内部)</h1>
+<h2>transaction pool:<span th:text="${transactionPoolBefore}">add transaction</span></h2>
+
+<h1>step3 ブロック追加(ブロック追加後)</h1>
+<h2>transaction pool after: <span th:text="${transactionPoolAfter}">after add block</span></h2>
+<h2>after add block: <span th:text="${addedBlock}">json</span></h2>
+
+
 </body>
 </html>

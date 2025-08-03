@@ -8,10 +8,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.HexFormat;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 @Component
 public class Blockchain {
@@ -23,12 +20,22 @@ public class Blockchain {
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
+    private final List<Map<String, Object>> transactionPool;
+    private final List<Map<String, Object>> chain = new ArrayList<>();
+
+    public Blockchain() {
+        this.transactionPool = new ArrayList<>();
+        this.chain.add(createBlock(0, "first block"));
+    }
+
     public Map<String, Object> createBlock(int nonce, String previousHash) {
         Map<String, Object> block = new LinkedHashMap<>();
         block.put(TIMESTAMP, System.currentTimeMillis());
-        block.put(TRANSACTIONS, new ArrayList<>());
+        List<Map<String, Object>> blockTransactions = new ArrayList<>(this.transactionPool);
+        block.put(TRANSACTIONS, blockTransactions);
         block.put(NONCE, nonce);
         block.put(PREVIOUS_HASH, previousHash);
+        this.transactionPool.clear();
         return Utils.sortedMapByKey(block);
     }
 
@@ -46,4 +53,25 @@ public class Blockchain {
         byte[] hashBytes = digest.digest(sortedBlockJson.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(hashBytes);
     }
+
+    public boolean addTransaction(String senderBlockchainAddress,
+                                  String recipientBlockchainAddress, double value) {
+        Transaction transaction = new Transaction(senderBlockchainAddress, recipientBlockchainAddress, value);
+        transactionPool.add(transaction.toMap());
+        return true;
+    }
+
+    public void mine() {
+        Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
+        this.chain.add(createBlock(0, changeToHash(newBlock)));
+    }
+
+    public List<Map<String, Object>> getChain() {
+        return this.chain;
+    }
+
+    public  List<Map<String, Object>> getTransactionPool(){
+        return this.transactionPool;
+    }
+
 }
