@@ -18,6 +18,8 @@ public class Blockchain {
     private static final String NONCE = "nonce";
     private static final String PREVIOUS_HASH = "previous_hash";
 
+    private static final Integer DIFFICULTY = 2;
+
     private final Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     private final List<Map<String, Object>> transactionPool;
@@ -63,14 +65,35 @@ public class Blockchain {
 
     public void mine() {
         Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
-        this.chain.add(createBlock(0, changeToHash(newBlock)));
+        int nonce = proofOfWork();
+        this.chain.add(createBlock(nonce, changeToHash(newBlock)));
+    }
+
+    public boolean validProof(List<Map<String, Object>> transaction, String previousHash, int nonce, int difficulty) {
+        Map<String, Object> guessBlock = new LinkedHashMap<>();
+        guessBlock.put(TRANSACTIONS, transaction);
+        guessBlock.put(PREVIOUS_HASH, previousHash);
+        guessBlock.put(NONCE, nonce);
+        guessBlock = Utils.sortedMapByKey(guessBlock);
+        String guessHash = changeToHash(guessBlock);
+        return guessHash != null && guessHash.startsWith("0".repeat(difficulty));
+    }
+
+    public int proofOfWork() {
+        List<Map<String, Object>> copiedTransactionPool = new ArrayList<>(this.transactionPool);
+        String previousHash = changeToHash(this.chain.get(this.chain.size() - 1));
+        int nonce = 0;
+        while (!validProof(copiedTransactionPool, previousHash, nonce, DIFFICULTY)) {
+            nonce++;
+        }
+        return nonce;
     }
 
     public List<Map<String, Object>> getChain() {
         return this.chain;
     }
 
-    public  List<Map<String, Object>> getTransactionPool(){
+    public List<Map<String, Object>> getTransactionPool() {
         return this.transactionPool;
     }
 

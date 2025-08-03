@@ -2,11 +2,15 @@ package io.alamoa.blockchain.controller;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.alamoa.blockchain.Utils;
 import io.alamoa.blockchain.model.Blockchain;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Controller
 public class TestController {
@@ -36,6 +40,19 @@ public class TestController {
         model.addAttribute("addedBlock", addBlock);
         String transactionPoolAfter = gson.toJson(blockchain.getTransactionPool());
         model.addAttribute("transactionPoolAfter", transactionPoolAfter);
+
+        //nonceの検証(同じnonceを使ってハッシュ値を作成)
+        int nonce = (int) blockchain.getChain().get(1).get("nonce");
+        Map<String,Object> firstBlock = blockchain.getChain().get(0);
+        Map<String,Object> secondBlock = blockchain.getChain().get(1);
+        Map<String, Object> guessBlock = new LinkedHashMap<>();
+        guessBlock.put("transactions", secondBlock.get("transactions"));
+        guessBlock.put("previous_hash", blockchain.changeToHash(firstBlock));
+        guessBlock.put("nonce", nonce);
+        guessBlock = Utils.sortedMapByKey(guessBlock);
+        String guessHash = blockchain.changeToHash(guessBlock);
+        model.addAttribute("nonce",nonce);
+        model.addAttribute("reproducedHash",guessHash);
         return "outputtest";
     }
 }
