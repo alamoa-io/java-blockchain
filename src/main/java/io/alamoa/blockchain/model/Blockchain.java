@@ -17,6 +17,9 @@ public class Blockchain {
     private static final String TRANSACTIONS = "transactions";
     private static final String NONCE = "nonce";
     private static final String PREVIOUS_HASH = "previous_hash";
+    private static final String VALUE = "value";
+    private final String RECIPIENT_BLOCKCHAIN_ADDRESS = "recipient_blockchain_address";
+    private final String SENDER_BLOCKCHAIN_ADDRESS = "sender_blockchain_address";
 
     private static final Integer DIFFICULTY = 2;
 
@@ -87,6 +90,21 @@ public class Blockchain {
             nonce++;
         }
         return nonce;
+    }
+
+    public double calculateTotalAmount(String blockchainAddress) {
+        return chain.stream()// リストをstreamに変換
+                //各ブロックの中のtransactionsの内容を取得し、一つのstreamにまとめる
+                .flatMap(block -> ((List<Map<String, Object>>) block.get(TRANSACTIONS)).stream())
+                //引数のblockchainAddressに該当する送り手、もしくは受け取り側のtransactionのみを対象とする
+                .filter(transaction -> transaction.get(SENDER_BLOCKCHAIN_ADDRESS).equals(blockchainAddress) ||
+                        transaction.get(RECIPIENT_BLOCKCHAIN_ADDRESS).equals(blockchainAddress))
+                //値を取り出し送り手側なら減算、受け取り側なら加算を行う
+                .mapToDouble(transaction -> {
+                    double value = Double.parseDouble((String) transaction.get(VALUE));
+                    return transaction.get(SENDER_BLOCKCHAIN_ADDRESS).equals(blockchainAddress) ? -value : value;
+                })
+                .sum();//合計値を出す
     }
 
     public List<Map<String, Object>> getChain() {

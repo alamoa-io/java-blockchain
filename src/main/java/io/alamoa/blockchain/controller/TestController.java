@@ -53,6 +53,13 @@ public class TestController {
         String guessHash = blockchain.changeToHash(guessBlock);
         model.addAttribute("nonce",nonce);
         model.addAttribute("reproducedHash",guessHash);
+
+        //各アドレスの合計値を取得する
+        model.addAttribute("AddressA",blockchain.calculateTotalAmount("A"));
+        model.addAttribute("AddressB",blockchain.calculateTotalAmount("B"));
+        model.addAttribute("AddressC",blockchain.calculateTotalAmount("C"));
+        model.addAttribute("AddressD",blockchain.calculateTotalAmount("D"));
+
         return "outputtest";
     }
 }
