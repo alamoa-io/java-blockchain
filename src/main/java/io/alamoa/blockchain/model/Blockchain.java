@@ -6,8 +6,9 @@ import io.alamoa.blockchain.Utils;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
 @Component
@@ -105,6 +106,30 @@ public class Blockchain {
                     return transaction.get(SENDER_BLOCKCHAIN_ADDRESS).equals(blockchainAddress) ? -value : value;
                 })
                 .sum();//合計値を出す
+    }
+
+    public boolean verifyTransactionSignature(PublicKey senderPublicKey,
+                                              String signatureHex, Map<String, Object> transaction) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException, InvalidKeyException, SignatureException {
+        Map<String,Object> sortedTransaction =  Utils.sortedMapByKey(transaction);
+        String transactionJson = gson.toJson(sortedTransaction);
+        // SHA-256 ハッシュアルゴリズムを使用
+        MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+        sha256.update(transactionJson.getBytes(StandardCharsets.UTF_8)); // UTF-8エンコーディングでデータを更新
+        byte[] message = sha256.digest(); // ハッシュ値を計算
+
+        byte[] publicKeyBytes = senderPublicKey.getEncoded();
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKeyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("EC");
+        PublicKey publicKey = keyFactory.generatePublic(keySpec);
+
+        // ECDSAによる署名検証
+        Signature signature = Signature.getInstance("SHA256withECDSA");
+        signature.initVerify(publicKey); // 公開鍵で署名器を初期化
+        signature.update(message);     // ハッシュ対象のメッセージをセット
+
+        // 署名文字列をバイト配列に変換して検証
+        byte[] signatureBytes = HexFormat.of().parseHex(signatureHex);
+        return signature.verify(signatureBytes); // 署名を検証
     }
 
     public List<Map<String, Object>> getChain() {

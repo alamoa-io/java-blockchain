@@ -1,10 +1,12 @@
 package io.alamoa.blockchain.model;
 
+import io.alamoa.blockchain.Utils;
 import org.bitcoinj.base.Base58;
 import org.bouncycastle.crypto.digests.RIPEMD160Digest;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
 import java.util.HexFormat;
@@ -75,5 +77,20 @@ public class Wallet {
 
         //Base58エンコード
         return Base58.encode(addressBytesForBase58);
+    }
+
+    public String generateSignature(String transactionData,String privateKeyHex) throws Exception {
+        // SHA-256ハッシュ化
+        MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+        byte[] message = sha256.digest(transactionData.getBytes(StandardCharsets.UTF_8));
+
+        // 署名を生成
+        PrivateKey privateKey = Utils.convertStringToPrivateKey(privateKeyHex);
+        java.security.Signature ecdsaSign = java.security.Signature.getInstance("SHA256withECDSA");
+        ecdsaSign.initSign(privateKey, new SecureRandom());
+        ecdsaSign.update(message);
+        byte[] signatureBytes = ecdsaSign.sign();
+
+        return Hex.toHexString(signatureBytes);
     }
 }
