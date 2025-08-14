@@ -3,7 +3,6 @@ package io.alamoa.blockchain.model;
 import io.alamoa.blockchain.Utils;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 public class Transaction {
