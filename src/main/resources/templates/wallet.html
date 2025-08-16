@@ -20,11 +20,73 @@
 <div>
   <h1>Send Money</h1>
   <div>
-    Address: <input id="recipient_blockchain_address" size="100"
-                    type="text"><br>
+    Address: <input id="recipient_blockchain_address" size="100" type="text"><br>
     Amount: <input id="send_amount" type="text"><br>
     <button id="send_money_button">Send</button>
   </div>
 </div>
+
+<script>
+  $(document).ready(function() {
+    // 10秒ごとに残高を更新する関数
+    function updateWalletAmount() {
+      const blockchainAddress = $('#blockchain_address').val();
+      if (!blockchainAddress) {
+        return;
+      }
+
+      $.ajax({
+        url: '/amount',
+        type: 'GET',
+        data: { address: blockchainAddress },
+        success: function(response) {
+          $('#wallet_amount').text(response);
+        },
+        error: function(xhr, status, error) {
+          console.error('Failed to fetch wallet amount:', error);
+        }
+      });
+    }
+
+    // ページ読み込み時に一度実行
+    updateWalletAmount();
+    // 以降、10秒ごとに実行
+    setInterval(updateWalletAmount, 10000);
+
+    // 送金ボタンのクリックイベント
+    $('#send_money_button').click(function() {
+      // 入力フィールドから値を取得します
+      var publicKey = $('#public_key').val();
+      var privateKey = $('#private_key').val();
+      var senderAddress = $('#blockchain_address').val();
+      var recipientAddress = $('#recipient_blockchain_address').val();
+      var amount = $('#send_amount').val();
+
+      // トランザクションデータのJSONオブジェクトを作成します
+      var transactionData = {
+        senderPrivateKey:privateKey,
+        senderBlockchainAddress: senderAddress,
+        recipientBlockchainAddress: recipientAddress,
+        senderPublicKey:publicKey,
+        amount: parseFloat(amount)
+      };
+
+      $.ajax({
+        url: '/addTransaction',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(transactionData),
+        success: function(response) {
+          alert('Transaction successful!');
+          // 送信後、すぐに残高を更新
+          updateWalletAmount();
+        },
+        error: function(xhr, status, error) {
+          alert('Error: ' + xhr.responseText);
+        }
+      });
+    });
+  });
+</script>
 </body>
 </html>
