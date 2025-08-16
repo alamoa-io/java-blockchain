@@ -10,6 +10,10 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class Blockchain {
@@ -23,15 +27,51 @@ public class Blockchain {
     private final String SENDER_BLOCKCHAIN_ADDRESS = "sender_blockchain_address";
 
     private static final Integer DIFFICULTY = 2;
+    private static final long MINING_TIMER_SEC = 20;
+    private static final double MINING_REWARD = 10.0;
+
+    private final Semaphore miningSemaphore = new Semaphore(1);
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     private final List<Map<String, Object>> transactionPool;
     private final List<Map<String, Object>> chain = new ArrayList<>();
+    private final String minerBlockchainAddress;
 
     public Blockchain() {
         this.transactionPool = new ArrayList<>();
         this.chain.add(createBlock(0, "first block"));
+        try {
+            Wallet minerWallet = new Wallet();
+            System.out.println("Miners Private Key: " + minerWallet.getPrivateKey());
+            System.out.println("Miners Public Key: " + minerWallet.getPublicKey());
+            System.out.println("Miners Blockchain Address: " + minerWallet.getBlockchainAddress());
+            this.minerBlockchainAddress = minerWallet.getBlockchainAddress();
+            addTransaction("REWARD!!", minerWallet.getBlockchainAddress(), MINING_REWARD);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        startMiningLoop();
+    }
+
+    public void startMining() {
+        // tryAcquire()で非ブロッキングにセマフォを取得
+        if (miningSemaphore.tryAcquire()) {
+            try {
+                // マイニングロジックを呼び出す
+                mine();
+            } finally {
+                // 必ずセマフォを解放する
+                miningSemaphore.release();
+            }
+        }
+    }
+
+    public void startMiningLoop() {
+        // 定期的に startMining メソッドを実行するようにスケジューリング
+        scheduler.scheduleAtFixedRate(this::startMining, 0, MINING_TIMER_SEC, TimeUnit.SECONDS);
     }
 
     public Map<String, Object> createBlock(int nonce, String previousHash) {
@@ -69,6 +109,7 @@ public class Blockchain {
 
     public void mine() {
         Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
+        addTransaction("REWARD!!", minerBlockchainAddress, MINING_REWARD);
         int nonce = proofOfWork();
         this.chain.add(createBlock(nonce, changeToHash(newBlock)));
     }
@@ -110,7 +151,7 @@ public class Blockchain {
 
     public boolean verifyTransactionSignature(PublicKey senderPublicKey,
                                               String signatureHex, Map<String, Object> transaction) throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException, InvalidKeyException, SignatureException {
-        Map<String,Object> sortedTransaction =  Utils.sortedMapByKey(transaction);
+        Map<String, Object> sortedTransaction = Utils.sortedMapByKey(transaction);
         String transactionJson = gson.toJson(sortedTransaction);
         // SHA-256 ハッシュアルゴリズムを使用
         MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
