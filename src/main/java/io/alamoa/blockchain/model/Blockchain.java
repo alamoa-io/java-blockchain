@@ -3,20 +3,26 @@ package io.alamoa.blockchain.model;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.alamoa.blockchain.Utils;
+import io.alamoa.blockchain.entity.TransactionRequest;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 @Component
 public class Blockchain {
+
+    @Autowired
+    NeighbourDiscovery neighbourDiscovery;
+    @Autowired
+    RestTemplate restTemplate;
 
     private static final String TIMESTAMP = "timestamp";
     private static final String TRANSACTIONS = "transactions";
@@ -41,7 +47,6 @@ public class Blockchain {
 
     public Blockchain() {
         this.transactionPool = new ArrayList<>();
-        this.chain.add(createBlock(0, "first block"));
         try {
             Wallet minerWallet = new Wallet();
             System.out.println("Miners Private Key: " + minerWallet.getPrivateKey());
@@ -52,7 +57,11 @@ public class Blockchain {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
 
+    @PostConstruct
+    public void init() {
+        this.chain.add(createBlock(0, "first block"));
         startMiningLoop();
     }
 
@@ -74,6 +83,11 @@ public class Blockchain {
         scheduler.scheduleAtFixedRate(this::startMining, 0, MINING_TIMER_SEC, TimeUnit.SECONDS);
     }
 
+    public boolean deleteTransactionPool() {
+        this.transactionPool.clear();
+        return true;
+    }
+
     public Map<String, Object> createBlock(int nonce, String previousHash) {
         Map<String, Object> block = new LinkedHashMap<>();
         block.put(TIMESTAMP, System.currentTimeMillis());
@@ -82,6 +96,10 @@ public class Blockchain {
         block.put(NONCE, nonce);
         block.put(PREVIOUS_HASH, previousHash);
         this.transactionPool.clear();
+        for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
+            String neighbourAddress = (String) neighbour;
+            restTemplate.delete("http://" + neighbourAddress + "/transactions");
+        }
         return Utils.sortedMapByKey(block);
     }
 
@@ -107,11 +125,76 @@ public class Blockchain {
         return true;
     }
 
+    public void addTransactionToNeighbour(TransactionRequest transactionRequest) {
+        for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
+            String neighbourAddress = (String) neighbour;
+            restTemplate.put("http://" + neighbourAddress + "/transactions", transactionRequest);
+        }
+    }
+
+    public boolean validChain(List<Map<String, Object>> chain) {
+        if (chain == null || chain.isEmpty()) return false;
+        Map<String, Object> preBlock = chain.get(0);
+        int currentIndex = 1;
+        while (currentIndex < chain.size()) {
+            Map<String, Object> block = chain.get(currentIndex);
+            String previousHash = (String) block.get(PREVIOUS_HASH);
+            String calculatedHash = changeToHash(preBlock);
+            if (!previousHash.equals(calculatedHash)) {
+                return false;
+            }
+            List<Map<String, Object>> transactions = (List<Map<String, Object>>) block.get(TRANSACTIONS);
+            int nonce = (int) block.get(NONCE);
+            if (!validProof(transactions, previousHash, nonce, DIFFICULTY)) {
+                return false;
+            }
+            preBlock = block;
+            currentIndex++;
+        }
+        return true;
+    }
+
+    public boolean resolveConflicts() {
+        List<Map<String, Object>> longestChain = null;
+        int maxLength = this.chain.size();
+        for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
+            String neighbourAddress = (String) neighbour;
+            try {
+                List<Map<String, Object>> neighbourChain = restTemplate.getForObject(
+                        "http://" + neighbourAddress + "/chain", List.class);
+
+                if (neighbourChain != null) {
+                    int chainLength = neighbourChain.size();
+                    if (chainLength > maxLength && validChain(neighbourChain)) {
+                        maxLength = chainLength;
+                        longestChain = neighbourChain;
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Error while resolving conflicts with neighbour: " + neighbourAddress);
+                e.printStackTrace();
+            }
+
+        }
+
+        if (longestChain != null) {
+            this.chain.clear();
+            this.chain.addAll(longestChain);
+            return true;
+        }
+        return false;
+    }
+
     public void mine() {
         Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
         addTransaction("REWARD!!", minerBlockchainAddress, MINING_REWARD);
         int nonce = proofOfWork();
         this.chain.add(createBlock(nonce, changeToHash(newBlock)));
+        for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
+            String neighbourAddress = (String) neighbour;
+            restTemplate.put("http://" + neighbourAddress + "/consensus", "check consensus");
+        }
+
     }
 
     public boolean validProof(List<Map<String, Object>> transaction, String previousHash, int nonce, int difficulty) {
