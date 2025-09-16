@@ -10,28 +10,30 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class Utils {
-    public static Map<String, Object> sortedMapByKey(Map<String, Object> unsortedMap) {
-        return unsortedMap.entrySet()
-                .stream()
-                .sorted(Map.Entry.comparingByKey())
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (oldValue, newValue) -> oldValue, LinkedHashMap::new));
-    }
+  public static Map<String, Object> sortedMapByKey(Map<String, Object> unsortedMap) {
+    return unsortedMap.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .collect(
+            Collectors.toMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue,
+                (oldValue, newValue) -> oldValue,
+                LinkedHashMap::new));
+  }
 
-    public static PublicKey convertStringToPublicKey(String keyHex) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        byte[] keyBytes = HexFormat.of().parseHex(keyHex);
-        KeyFactory keyFactory = KeyFactory.getInstance("EC");
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
-        return keyFactory.generatePublic(keySpec);
-    }
+  public static PublicKey convertStringToPublicKey(String keyHex)
+      throws NoSuchAlgorithmException, InvalidKeySpecException {
+    byte[] keyBytes = HexFormat.of().parseHex(keyHex);
+    KeyFactory keyFactory = KeyFactory.getInstance("EC");
+    X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
+    return keyFactory.generatePublic(keySpec);
+  }
 
-    public static PrivateKey convertStringToPrivateKey(String keyHex) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        byte[] keyBytes = HexFormat.of().parseHex(keyHex);
-        KeyFactory keyFactory = KeyFactory.getInstance("EC");
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
-        return keyFactory.generatePrivate(keySpec);
-    }
+  public static PrivateKey convertStringToPrivateKey(String keyHex)
+      throws NoSuchAlgorithmException, InvalidKeySpecException {
+    byte[] keyBytes = HexFormat.of().parseHex(keyHex);
+    KeyFactory keyFactory = KeyFactory.getInstance("EC");
+    PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+    return keyFactory.generatePrivate(keySpec);
+  }
 }
-
