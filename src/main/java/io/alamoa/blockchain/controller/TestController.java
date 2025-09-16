@@ -11,31 +11,30 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class TestController {
 
-    @Autowired
-    private Blockchain blockchain;
+  @Autowired private Blockchain blockchain;
 
-    @GetMapping("/test")
-    public String test(Model model) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+  @GetMapping("/test")
+  public String test(Model model) {
+    Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
-        //初期ブロック作成
-        String initBlock = gson.toJson(blockchain.getChain());
-        model.addAttribute("first", initBlock);
+    // 初期ブロック作成
+    String initBlock = gson.toJson(blockchain.getChain());
+    model.addAttribute("first", initBlock);
 
-        //transactionの追加
-        blockchain.addTransaction("A", "B", 10);
-        blockchain.addTransaction("C", "D", 20);
-        String transactionPoolBefore = gson.toJson(blockchain.getTransactionPool());
-        model.addAttribute("transactionPoolBefore", transactionPoolBefore);
+    // transactionの追加
+    blockchain.addTransaction("A", "B", 10);
+    blockchain.addTransaction("C", "D", 20);
+    String transactionPoolBefore = gson.toJson(blockchain.getTransactionPool());
+    model.addAttribute("transactionPoolBefore", transactionPoolBefore);
 
-        //blockの追加
-        blockchain.mine();
+    // blockの追加
+    blockchain.mine();
 
-        //block追加後のデータ状態の取得
-        String addBlock = gson.toJson(blockchain.getChain());
-        model.addAttribute("addedBlock", addBlock);
-        String transactionPoolAfter = gson.toJson(blockchain.getTransactionPool());
-        model.addAttribute("transactionPoolAfter", transactionPoolAfter);
-        return "outputtest";
-    }
+    // block追加後のデータ状態の取得
+    String addBlock = gson.toJson(blockchain.getChain());
+    model.addAttribute("addedBlock", addBlock);
+    String transactionPoolAfter = gson.toJson(blockchain.getTransactionPool());
+    model.addAttribute("transactionPoolAfter", transactionPoolAfter);
+    return "outputtest";
+  }
 }
