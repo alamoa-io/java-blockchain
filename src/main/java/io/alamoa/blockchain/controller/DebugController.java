@@ -13,7 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Controller
-public class TestController {
+public class DebugController {
 
     @Autowired
     private Blockchain blockchain;
