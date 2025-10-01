@@ -9,7 +9,7 @@ import io.alamoa.blockchain.model.Transaction;
 import io.alamoa.blockchain.model.Wallet;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -20,7 +20,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 import java.util.concurrent.*;
 
-@Component
+@Service
 public class BlockchainService {
 
   @Autowired NeighbourDiscovery neighbourDiscovery;
