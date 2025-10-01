@@ -1,12 +1,16 @@
-package io.alamoa.blockchain.model;
+package io.alamoa.blockchain.service;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.alamoa.blockchain.Utils;
 import io.alamoa.blockchain.entity.TransactionRequest;
+import io.alamoa.blockchain.model.NeighbourDiscovery;
+import io.alamoa.blockchain.model.Transaction;
+import io.alamoa.blockchain.model.Wallet;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -17,7 +21,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 @Component
-public class Blockchain {
+public class BlockchainService {
 
   @Autowired NeighbourDiscovery neighbourDiscovery;
   @Autowired RestTemplate restTemplate;
@@ -43,7 +47,7 @@ public class Blockchain {
   private final List<Map<String, Object>> chain = new ArrayList<>();
   private final String minerBlockchainAddress;
 
-  public Blockchain() {
+  public BlockchainService() {
     this.transactionPool = new ArrayList<>();
     try {
       Wallet minerWallet = new Wallet();
@@ -61,6 +65,35 @@ public class Blockchain {
   public void init() {
     this.chain.add(createBlock(0, "first block"));
     startMiningLoop();
+  }
+
+  public boolean processTransaction(TransactionRequest transactionRequest) throws Exception {
+    boolean isVerified = false;
+    try {
+      isVerified =
+          verifyTransactionSignature(
+              Utils.convertStringToPublicKey(transactionRequest.getSenderPublicKey()),
+              transactionRequest.getSignature(),
+              transactionRequest.getTransactionData());
+    } catch (Exception e) {
+      throw new Exception("システムエラーが発生しました。管理者にお問い合わせ下さい");
+    }
+
+    if (isVerified) {
+      throw new Exception("設定しているKeyに誤りがあります。入力内容を確認して下さい。");
+    }
+
+    return addTransaction(
+        transactionRequest.getSenderBlockchainAddress(),
+        transactionRequest.getRecipientBlockchainAddress(),
+        transactionRequest.getAmount());
+  }
+
+  public void processPutTransaction(TransactionRequest transactionRequest) throws Exception {
+    boolean isTransacted = processTransaction(transactionRequest);
+    if (isTransacted) {
+      addTransactionToNeighbour(transactionRequest);
+    }
   }
 
   public void startMining() {
@@ -127,7 +160,13 @@ public class Blockchain {
   public void addTransactionToNeighbour(TransactionRequest transactionRequest) {
     for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
       String neighbourAddress = (String) neighbour;
-      restTemplate.put("http://" + neighbourAddress + "/transactions", transactionRequest);
+      try {
+        restTemplate.put("http://" + neighbourAddress + "/transactions", transactionRequest);
+      } catch (RestClientException e) {
+        // TODO ログの出力 想定された例外
+      } catch (Exception e) {
+        // TODO ログの出力 想定されていない例外
+      }
     }
   }
 
