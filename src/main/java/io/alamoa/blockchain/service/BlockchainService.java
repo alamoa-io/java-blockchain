@@ -10,17 +10,18 @@ import io.alamoa.blockchain.model.NeighbourDiscovery;
 import io.alamoa.blockchain.model.Transaction;
 import io.alamoa.blockchain.model.Wallet;
 import jakarta.annotation.PostConstruct;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
-import java.nio.charset.StandardCharsets;
-import java.security.*;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.*;
-import java.util.concurrent.*;
 
 @Service
 public class BlockchainService {
@@ -29,22 +30,8 @@ public class BlockchainService {
   @Autowired RestTemplate restTemplate;
   @Autowired BlockchainLogic blockchainLogic;
 
-  private static final String TIMESTAMP = "timestamp";
-  private static final String TRANSACTIONS = "transactions";
-  private static final String NONCE = "nonce";
-  private static final String PREVIOUS_HASH = "previous_hash";
-  private static final String VALUE = "value";
-  private final String RECIPIENT_BLOCKCHAIN_ADDRESS = "recipient_blockchain_address";
-  private final String SENDER_BLOCKCHAIN_ADDRESS = "sender_blockchain_address";
-
-  private static final Integer DIFFICULTY = 2;
-  private static final long MINING_TIMER_SEC = 20;
-  private static final double MINING_REWARD = 10.0;
-
   private final Semaphore miningSemaphore = new Semaphore(1);
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
-  private final Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
   private final List<Map<String, Object>> transactionPool;
   private final List<Map<String, Object>> chain = new ArrayList<>();
@@ -58,7 +45,10 @@ public class BlockchainService {
       System.out.println("Miners Public Key: " + minerWallet.getPublicKey());
       System.out.println("Miners Blockchain Address: " + minerWallet.getBlockchainAddress());
       this.minerBlockchainAddress = minerWallet.getBlockchainAddress();
-      addTransaction("REWARD!!", minerWallet.getBlockchainAddress(), BlockChainConstants.MINING_REWARD.getDouble());
+      addTransaction(
+          "REWARD!!",
+          minerWallet.getBlockchainAddress(),
+          BlockChainConstants.MINING_REWARD.getDouble());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -114,7 +104,8 @@ public class BlockchainService {
 
   public void startMiningLoop() {
     // 定期的に startMining メソッドを実行するようにスケジューリング
-    scheduler.scheduleAtFixedRate(this::startMining, 0, BlockChainConstants.MINING_TIMER_SEC.getLong(), TimeUnit.SECONDS);
+    scheduler.scheduleAtFixedRate(
+        this::startMining, 0, BlockChainConstants.MINING_TIMER_SEC.getLong(), TimeUnit.SECONDS);
   }
 
   public boolean deleteTransactionPool() {
@@ -190,7 +181,8 @@ public class BlockchainService {
 
   public void mine() {
     Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
-    addTransaction("REWARD!!", minerBlockchainAddress, BlockChainConstants.MINING_REWARD.getDouble());
+    addTransaction(
+        "REWARD!!", minerBlockchainAddress, BlockChainConstants.MINING_REWARD.getDouble());
     int nonce = blockchainLogic.proofOfWork(this.transactionPool, this.chain);
     this.chain.add(createBlock(nonce, blockchainLogic.changeToHash(newBlock)));
     for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
@@ -202,17 +194,29 @@ public class BlockchainService {
   public double calculateTotalAmount(String blockchainAddress) {
     return chain.stream() // リストをstreamに変換
         // 各ブロックの中のtransactionsの内容を取得し、一つのstreamにまとめる
-        .flatMap(block -> ((List<Map<String, Object>>) block.get(BlockChainConstants.TRANSACTIONS.getString())).stream())
+        .flatMap(
+            block ->
+                ((List<Map<String, Object>>)
+                        block.get(BlockChainConstants.TRANSACTIONS.getString()))
+                    .stream())
         // 引数のblockchainAddressに該当する送り手、もしくは受け取り側のtransactionのみを対象とする
         .filter(
             transaction ->
-                transaction.get(BlockChainConstants.SENDER_BLOCKCHAIN_ADDRESS.getString()).equals(blockchainAddress)
-                    || transaction.get(BlockChainConstants.RECIPIENT_BLOCKCHAIN_ADDRESS.getString()).equals(blockchainAddress))
+                transaction
+                        .get(BlockChainConstants.SENDER_BLOCKCHAIN_ADDRESS.getString())
+                        .equals(blockchainAddress)
+                    || transaction
+                        .get(BlockChainConstants.RECIPIENT_BLOCKCHAIN_ADDRESS.getString())
+                        .equals(blockchainAddress))
         // 値を取り出し送り手側なら減算、受け取り側なら加算を行う
         .mapToDouble(
             transaction -> {
-              double value = Double.parseDouble((String) transaction.get(BlockChainConstants.VALUE.getString()));
-              return transaction.get(BlockChainConstants.SENDER_BLOCKCHAIN_ADDRESS.getString()).equals(blockchainAddress)
+              double value =
+                  Double.parseDouble(
+                      (String) transaction.get(BlockChainConstants.VALUE.getString()));
+              return transaction
+                      .get(BlockChainConstants.SENDER_BLOCKCHAIN_ADDRESS.getString())
+                      .equals(blockchainAddress)
                   ? -value
                   : value;
             })

@@ -1,6 +1,5 @@
 package io.alamoa.blockchain.controller;
 
-import io.alamoa.blockchain.Utils;
 import io.alamoa.blockchain.entity.TransactionRequest;
 import io.alamoa.blockchain.service.BlockchainService;
 import java.util.List;
