@@ -3,6 +3,7 @@ package io.alamoa.blockchain.controller;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.alamoa.blockchain.Utils;
+import io.alamoa.blockchain.logic.BlockchainLogic;
 import io.alamoa.blockchain.service.BlockchainService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -16,6 +17,7 @@ import java.util.Map;
 public class DebugController {
 
   @Autowired private BlockchainService blockchainService;
+  @Autowired private BlockchainLogic blockchainLogic;
 
   @GetMapping("/test")
   public String test(Model model) {
@@ -46,10 +48,10 @@ public class DebugController {
     Map<String, Object> secondBlock = blockchainService.getChain().get(1);
     Map<String, Object> guessBlock = new LinkedHashMap<>();
     guessBlock.put("transactions", secondBlock.get("transactions"));
-    guessBlock.put("previous_hash", blockchainService.changeToHash(firstBlock));
+    guessBlock.put("previous_hash", blockchainLogic.changeToHash(firstBlock));
     guessBlock.put("nonce", nonce);
     guessBlock = Utils.sortedMapByKey(guessBlock);
-    String guessHash = blockchainService.changeToHash(guessBlock);
+    String guessHash = blockchainLogic.changeToHash(guessBlock);
     model.addAttribute("nonce", nonce);
     model.addAttribute("reproducedHash", guessHash);
 
