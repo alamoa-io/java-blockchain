@@ -3,6 +3,7 @@ package io.alamoa.blockchain.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.alamoa.blockchain.Utils;
+import io.alamoa.blockchain.constant.BlockChainConstants;
 import io.alamoa.blockchain.entity.TransactionRequest;
 import io.alamoa.blockchain.logic.BlockchainLogic;
 import io.alamoa.blockchain.model.NeighbourDiscovery;
@@ -57,7 +58,7 @@ public class BlockchainService {
       System.out.println("Miners Public Key: " + minerWallet.getPublicKey());
       System.out.println("Miners Blockchain Address: " + minerWallet.getBlockchainAddress());
       this.minerBlockchainAddress = minerWallet.getBlockchainAddress();
-      addTransaction("REWARD!!", minerWallet.getBlockchainAddress(), MINING_REWARD);
+      addTransaction("REWARD!!", minerWallet.getBlockchainAddress(), BlockChainConstants.MINING_REWARD.getDouble());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -113,7 +114,7 @@ public class BlockchainService {
 
   public void startMiningLoop() {
     // 定期的に startMining メソッドを実行するようにスケジューリング
-    scheduler.scheduleAtFixedRate(this::startMining, 0, MINING_TIMER_SEC, TimeUnit.SECONDS);
+    scheduler.scheduleAtFixedRate(this::startMining, 0, BlockChainConstants.MINING_TIMER_SEC.getLong(), TimeUnit.SECONDS);
   }
 
   public boolean deleteTransactionPool() {
@@ -123,11 +124,11 @@ public class BlockchainService {
 
   public Map<String, Object> createBlock(int nonce, String previousHash) {
     Map<String, Object> block = new LinkedHashMap<>();
-    block.put(TIMESTAMP, System.currentTimeMillis());
+    block.put(BlockChainConstants.TIMESTAMP.getString(), System.currentTimeMillis());
     List<Map<String, Object>> blockTransactions = new ArrayList<>(this.transactionPool);
-    block.put(TRANSACTIONS, blockTransactions);
-    block.put(NONCE, nonce);
-    block.put(PREVIOUS_HASH, previousHash);
+    block.put(BlockChainConstants.TRANSACTIONS.getString(), blockTransactions);
+    block.put(BlockChainConstants.NONCE.getString(), nonce);
+    block.put(BlockChainConstants.PREVIOUS_HASH.getString(), previousHash);
     this.transactionPool.clear();
     for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
       String neighbourAddress = (String) neighbour;
@@ -189,7 +190,7 @@ public class BlockchainService {
 
   public void mine() {
     Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
-    addTransaction("REWARD!!", minerBlockchainAddress, MINING_REWARD);
+    addTransaction("REWARD!!", minerBlockchainAddress, BlockChainConstants.MINING_REWARD.getDouble());
     int nonce = blockchainLogic.proofOfWork(this.transactionPool, this.chain);
     this.chain.add(createBlock(nonce, blockchainLogic.changeToHash(newBlock)));
     for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
@@ -201,17 +202,17 @@ public class BlockchainService {
   public double calculateTotalAmount(String blockchainAddress) {
     return chain.stream() // リストをstreamに変換
         // 各ブロックの中のtransactionsの内容を取得し、一つのstreamにまとめる
-        .flatMap(block -> ((List<Map<String, Object>>) block.get(TRANSACTIONS)).stream())
+        .flatMap(block -> ((List<Map<String, Object>>) block.get(BlockChainConstants.TRANSACTIONS.getString())).stream())
         // 引数のblockchainAddressに該当する送り手、もしくは受け取り側のtransactionのみを対象とする
         .filter(
             transaction ->
-                transaction.get(SENDER_BLOCKCHAIN_ADDRESS).equals(blockchainAddress)
-                    || transaction.get(RECIPIENT_BLOCKCHAIN_ADDRESS).equals(blockchainAddress))
+                transaction.get(BlockChainConstants.SENDER_BLOCKCHAIN_ADDRESS.getString()).equals(blockchainAddress)
+                    || transaction.get(BlockChainConstants.RECIPIENT_BLOCKCHAIN_ADDRESS.getString()).equals(blockchainAddress))
         // 値を取り出し送り手側なら減算、受け取り側なら加算を行う
         .mapToDouble(
             transaction -> {
-              double value = Double.parseDouble((String) transaction.get(VALUE));
-              return transaction.get(SENDER_BLOCKCHAIN_ADDRESS).equals(blockchainAddress)
+              double value = Double.parseDouble((String) transaction.get(BlockChainConstants.VALUE.getString()));
+              return transaction.get(BlockChainConstants.SENDER_BLOCKCHAIN_ADDRESS.getString()).equals(blockchainAddress)
                   ? -value
                   : value;
             })
