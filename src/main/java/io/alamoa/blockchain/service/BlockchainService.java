@@ -1,12 +1,10 @@
 package io.alamoa.blockchain.service;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import io.alamoa.blockchain.Utils;
 import io.alamoa.blockchain.constant.BlockChainConstants;
 import io.alamoa.blockchain.entity.TransactionRequest;
 import io.alamoa.blockchain.logic.BlockchainLogic;
-import io.alamoa.blockchain.model.NeighbourDiscovery;
+import io.alamoa.blockchain.infrastructure.NeighbourDiscovery;
 import io.alamoa.blockchain.model.Transaction;
 import io.alamoa.blockchain.model.Wallet;
 import jakarta.annotation.PostConstruct;
