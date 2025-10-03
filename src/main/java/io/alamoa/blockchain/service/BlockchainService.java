@@ -16,6 +16,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -23,6 +26,8 @@ import org.springframework.web.client.RestTemplate;
 
 @Service
 public class BlockchainService {
+
+  private static final Logger logger = LoggerFactory.getLogger(BlockchainService.class);
 
   @Autowired NeighbourDiscovery neighbourDiscovery;
   @Autowired RestTemplate restTemplate;
@@ -48,12 +53,14 @@ public class BlockchainService {
           minerWallet.getBlockchainAddress(),
           BlockChainConstants.MINING_REWARD.getDouble());
     } catch (Exception e) {
+      logger.error("Failed to initialize miner wallet.", e);
       throw new RuntimeException(e);
     }
   }
 
   @PostConstruct
   public void init() {
+    logger.info("Blockchain initialized with genesis block.");
     this.chain.add(createBlock(0, "first block"));
     startMiningLoop();
   }
@@ -66,11 +73,16 @@ public class BlockchainService {
               Utils.convertStringToPublicKey(transactionRequest.getSenderPublicKey()),
               transactionRequest.getSignature(),
               transactionRequest.getTransactionData());
+
     } catch (Exception e) {
+      logger.error("System error during transaction signature verification.", e);
       throw new Exception("システムエラーが発生しました。管理者にお問い合わせ下さい");
     }
 
     if (isVerified) {
+      logger.warn(
+          "Transaction verification failed for sender: {}",
+          transactionRequest.getSenderBlockchainAddress());
       throw new Exception("設定しているKeyに誤りがあります。入力内容を確認して下さい。");
     }
 
@@ -83,6 +95,9 @@ public class BlockchainService {
   public void processPutTransaction(TransactionRequest transactionRequest) throws Exception {
     boolean isTransacted = processTransaction(transactionRequest);
     if (isTransacted) {
+      logger.info(
+          "Transaction added to pool and propagating to neighbours. Tx: {}",
+          transactionRequest.getTransactionData());
       addTransactionToNeighbour(transactionRequest);
     }
   }
@@ -92,21 +107,27 @@ public class BlockchainService {
     if (miningSemaphore.tryAcquire()) {
       try {
         // マイニングロジックを呼び出す
+        logger.info("Mining started. Current pool size: {}", transactionPool.size());
         mine();
       } finally {
         // 必ずセマフォを解放する
         miningSemaphore.release();
+        logger.info("Mining finished and semaphore released.");
       }
     }
   }
 
   public void startMiningLoop() {
     // 定期的に startMining メソッドを実行するようにスケジューリング
+    logger.info(
+        "Scheduled mining loop started with rate: {} seconds.",
+        BlockChainConstants.MINING_TIMER_SEC.getLong());
     scheduler.scheduleAtFixedRate(
         this::startMining, 0, BlockChainConstants.MINING_TIMER_SEC.getLong(), TimeUnit.SECONDS);
   }
 
   public boolean deleteTransactionPool() {
+    logger.info("Transaction pool cleared. Removed {} transactions.", this.transactionPool.size());
     this.transactionPool.clear();
     return true;
   }
@@ -140,14 +161,17 @@ public class BlockchainService {
       try {
         restTemplate.put("http://" + neighbourAddress + "/transactions", transactionRequest);
       } catch (RestClientException e) {
-        // TODO ログの出力 想定された例外
+        logger.warn("Failed to clear transaction pool on neighbour: {}", neighbourAddress, e);
       } catch (Exception e) {
-        // TODO ログの出力 想定されていない例外
+        logger.error("Unexpected error when propagating transaction to {}.", neighbourAddress, e);
       }
     }
   }
 
   public boolean resolveConflicts() {
+    logger.info(
+        "Starting conflict resolution (consensus check). Current chain length: {}",
+        this.chain.size());
     List<Map<String, Object>> longestChain = null;
     int maxLength = this.chain.size();
     for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
@@ -164,16 +188,19 @@ public class BlockchainService {
           }
         }
       } catch (Exception e) {
-        System.out.println("Error while resolving conflicts with neighbour: " + neighbourAddress);
-        e.printStackTrace();
+        logger.error("Error while resolving conflicts with neighbour: {}", neighbourAddress, e);
       }
     }
 
     if (longestChain != null) {
+      logger.info(
+          "Conflict resolved. Chain replaced with a longer valid chain of length {}.",
+          this.chain.size());
       this.chain.clear();
       this.chain.addAll(longestChain);
       return true;
     }
+    logger.info("Conflict resolution finished. Local chain remains the longest/valid one.");
     return false;
   }
 
@@ -181,8 +208,13 @@ public class BlockchainService {
     Map<String, Object> newBlock = this.chain.get(this.chain.size() - 1);
     addTransaction(
         "REWARD!!", minerBlockchainAddress, BlockChainConstants.MINING_REWARD.getDouble());
+    logger.info("Starting Proof of Work...");
     int nonce = blockchainLogic.proofOfWork(this.transactionPool, this.chain);
+    logger.info("Proof of Work successful. Nonce: {}", nonce);
     this.chain.add(createBlock(nonce, blockchainLogic.changeToHash(newBlock)));
+    logger.info("New Block added to chain. Block Index: {}, Nonce: {}", this.chain.size(), nonce);
+
+    logger.info("Propagating new block to neighbours for consensus check.");
     for (Object neighbour : neighbourDiscovery.getNeighbours().keySet()) {
       String neighbourAddress = (String) neighbour;
       restTemplate.put("http://" + neighbourAddress + "/consensus", "check consensus");
